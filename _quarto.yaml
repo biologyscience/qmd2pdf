@@ -1,0 +1,26 @@
+format:
+  pdf:
+    include-in-header:
+      text: |
+        \usepackage{mdframed}
+        \newmdenv[
+          linewidth=0.75pt,
+          linecolor=black,
+          innerleftmargin=8pt,
+          innerrightmargin=8pt,
+          innertopmargin=8pt,
+          innerbottommargin=8pt
+        ]{mybox}
+
+        \usepackage{fancyhdr}
+        \fancypagestyle{startHeader} {
+          \fancyhead[L]{Homework 2}
+          \fancyhead[C]{ESE 5700}
+          \fancyhead[R]{Shiva Prasad}
+        }
+    pdf-engine: xelatex
+    geometry:
+      - margin=1in
+
+filters:
+  - filter.lua
