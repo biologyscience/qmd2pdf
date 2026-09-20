@@ -16,7 +16,7 @@ format:
         \fancypagestyle{startHeader} {
           \fancyhead[L]{Homework 2}
           \fancyhead[C]{ESE 5700}
-          \fancyhead[R]{Shiva Prasad}
+          \fancyhead[R]{}
         }
     pdf-engine: xelatex
     geometry:
