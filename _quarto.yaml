@@ -2,6 +2,8 @@ format:
   pdf:
     include-in-header:
       text: |
+        \usepackage{amsmath}
+        
         \usepackage{mdframed}
         \newmdenv[
           linewidth=0.75pt,
@@ -14,8 +16,8 @@ format:
 
         \usepackage{fancyhdr}
         \fancypagestyle{startHeader} {
-          \fancyhead[L]{Homework 2}
-          \fancyhead[C]{ESE 5700}
+          \fancyhead[L]{Homework 7}
+          \fancyhead[C]{ESE 5720}
           \fancyhead[R]{Shiva Prasad}
         }
     pdf-engine: xelatex
@@ -24,3 +26,6 @@ format:
 
 filters:
   - filter.lua
+
+execute:
+  echo: false

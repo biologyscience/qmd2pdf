@@ -8,6 +8,55 @@ function Div(el)
     }
   end
 
+  if el.classes:includes("row") then
+    local left = nil
+    local right = nil
+
+    local left_size = tonumber(el.attributes["split"]) or 0.5
+
+    for _, child in ipairs(el.content) do
+        if child.t == "Div" then
+            if child.classes:includes("left") then
+                left = child
+            elseif child.classes:includes("right") then
+                right = child
+            end
+        end
+    end
+
+    if not left or not right then
+        return nil
+    end
+
+    local left_content = pandoc.write(
+        pandoc.Pandoc(left.content),
+        "latex"
+    )
+
+    local right_content = pandoc.write(
+        pandoc.Pandoc(right.content),
+        "latex"
+    )
+
+    local latex =
+        "\\noindent\n" ..
+        "\\begin{minipage}[t]{" ..
+        left_size ..
+        "\\linewidth}\n" ..
+        "\\vspace{0pt}\n" ..
+        left_content ..
+        "\\end{minipage}" ..
+        "\\hfill\n" ..
+        "\\begin{minipage}[t]{\\dimexpr " ..
+        (1 - left_size) ..
+        "\\linewidth - 0.02\\linewidth\\relax}\n" ..
+        "\\vspace{0pt}\n" ..
+        right_content ..
+        "\\end{minipage}\n"
+
+    return pandoc.RawBlock("latex", latex)
+  end
+
   if el.classes:includes("small") then
     return {
       pandoc.RawBlock("latex", "\\begin{small}"),
@@ -29,10 +78,12 @@ function Div(el)
 
     return result
   end
-
+  
+  return el
 end
 
 function Table(tbl)
+
   if not (FORMAT:match("latex") or FORMAT:match("beamer")) then
     return nil
   end
@@ -92,4 +143,17 @@ function Table(tbl)
     .. "\n\\end{tabular}\n\\par\n\\endgroup"
 
   return pandoc.RawBlock("latex", latex)
+end
+
+function Str(el)
+    local value = el.text:match("^{{(.+)}}$")
+
+    if value then
+        return pandoc.RawInline(
+            "latex",
+            "\\vspace{" .. value .. "}"
+        )
+    end
+
+    return nil
 end

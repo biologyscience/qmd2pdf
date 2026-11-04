@@ -12,7 +12,7 @@ function build(filepath)
 
 if (!process.argv[2]) return;
 
-const file = process.argv[2].endsWith('.qmd') ? process.argv[2] : `${process.argv[2]}.qmd`;
+const file = process.argv[2].endsWith('.qmd') ? process.argv[2] : `${process.argv[2]}/file.qmd`;
 
 if (!existsSync(file)) return;
 
