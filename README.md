@@ -33,9 +33,10 @@ Lua filters, and other project files are copied too; common generated and
 dependency directories are excluded. The temporary copy is removed when the
 preview closes.
 
-The extension uses its own `_quarto.yaml` and `filter.lua` for every preview,
-overriding project-local files with those names. On first use, editable copies
-of the bundled defaults are created in the extension's global storage. Run
+Project-local `_quarto.yaml` (or `_quarto.yml`) and `filter.lua` are preserved
+and used when present. The extension supplies its global YAML or Lua filter
+only when that corresponding project file is missing. On first use, editable
+copies of the bundled defaults are created in the extension's global storage. Run
 **qmd2pdf: Open Preview Config Files** from the Command Palette to open both files
 for editing. Changes apply to previews started after the files are saved.
 Alternatively, set **qmd2pdf: Config Directory** in VS Code Settings

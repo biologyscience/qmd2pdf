@@ -4,6 +4,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { ensureProjectConfigFallbacks } from "./project-config";
 
 interface PreviewSession {
   process?: ChildProcess;
@@ -108,10 +109,7 @@ async function startPreview(context: vscode.ExtensionContext): Promise<void> {
     });
 
     const relativeFile = path.relative(sourceRoot, file);
-    await Promise.all([
-      fs.copyFile(configPaths.quartoYaml, path.join(session.workspaceDirectory, "_quarto.yaml")),
-      fs.copyFile(configPaths.luaFilter, path.join(session.workspaceDirectory, "filter.lua")),
-    ]);
+    await ensureProjectConfigFallbacks(session.workspaceDirectory, configPaths);
     const stagedFile = path.join(session.workspaceDirectory, relativeFile);
     await fs.mkdir(path.dirname(stagedFile), { recursive: true });
     session.stagedFile = stagedFile;
@@ -421,9 +419,6 @@ function shouldCopyProjectPath(sourceRoot: string, sourcePath: string): boolean 
   }
 
   const segments = relativePath.split(path.sep);
-  if (segments.length === 1 && ["_quarto.yaml", "_quarto.yml", "filter.lua"].includes(segments[0].toLowerCase())) {
-    return false;
-  }
   return !segments.some((segment) => excludedDirectories.has(segment.toLowerCase()));
 }
 
