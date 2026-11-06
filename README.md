@@ -21,6 +21,9 @@ Command Palette or use the play button in the editor title. The preview opens
 beside the document. Use **qmd2pdf: Stop Live Preview** or close the
 preview tab to stop it.
 
+Use **Save PDF As...** in the preview toolbar to save the latest rendered PDF
+to a location selected in the native save dialog.
+
 Each preview gets a temporary isolated copy of the Quarto project. Quarto
 renders the copied document and writes generated files there, leaving the
 original project untouched. The active editor's QMD contents are synchronized

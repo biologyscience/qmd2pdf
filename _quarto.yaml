@@ -14,6 +14,11 @@ format:
           innerbottommargin=8pt
         ]{mybox}
 
+        \usepackage{fancyhdr}
+        \fancypagestyle{startHeader} {
+          \fancyhead[C]{ }
+        }
+
     pdf-engine: xelatex
     geometry:
       - margin=1in

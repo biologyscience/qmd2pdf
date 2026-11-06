@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -11,6 +12,8 @@ interface PreviewSession {
   stopping: boolean;
   workspaceDirectory: string;
   stagedFile: string;
+  stagedPdf: string;
+  savingPdf: boolean;
   syncQueue: Promise<void>;
   cleanupPromise?: Promise<void>;
 }
@@ -79,6 +82,8 @@ async function startPreview(context: vscode.ExtensionContext): Promise<void> {
     stopping: false,
     workspaceDirectory: "",
     stagedFile: "",
+    stagedPdf: "",
+    savingPdf: false,
     syncQueue: Promise.resolve(),
   };
   previews.set(file, session);
@@ -110,6 +115,10 @@ async function startPreview(context: vscode.ExtensionContext): Promise<void> {
     const stagedFile = path.join(session.workspaceDirectory, relativeFile);
     await fs.mkdir(path.dirname(stagedFile), { recursive: true });
     session.stagedFile = stagedFile;
+    session.stagedPdf = path.join(
+      path.dirname(stagedFile),
+      `${path.basename(stagedFile, path.extname(stagedFile))}.pdf`,
+    );
     session.syncQueue = session.syncQueue.then(() => fs.writeFile(stagedFile, document.getText(), "utf8"));
     await session.syncQueue;
 
@@ -117,6 +126,13 @@ async function startPreview(context: vscode.ExtensionContext): Promise<void> {
       await cleanupWorkspace(session);
       return;
     }
+
+    panel.webview.onDidReceiveMessage(async (message: unknown) => {
+      if (!isRecord(message) || message.type !== "savePdf") {
+        return;
+      }
+      await saveRenderedPdf(session, file);
+    });
 
     const child = spawn("quarto", ["preview", relativeFile, "--no-browser"], {
       cwd: session.workspaceDirectory,
@@ -178,20 +194,47 @@ async function showPreview(session: PreviewSession, previewUrl: string): Promise
 
     const frameOrigin = new URL(externalUri.toString()).origin;
     const frameUrl = escapeHtml(externalUri.toString());
+    const nonce = randomBytes(16).toString("base64");
     session.panel.webview.html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src ${escapeHtml(frameOrigin)}; style-src 'unsafe-inline';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src ${escapeHtml(frameOrigin)}; script-src 'nonce-${nonce}'; style-src 'unsafe-inline';">
   <title>qmd2pdf</title>
   <style>
-    html, body, iframe { width: 100%; height: 100%; margin: 0; border: 0; }
-    body { overflow: hidden; }
+    html, body { width: 100%; height: 100%; margin: 0; }
+    body { display: flex; flex-direction: column; overflow: hidden; color: var(--vscode-foreground); background: var(--vscode-editor-background); font-family: var(--vscode-font-family); }
+    header { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--vscode-panel-border); }
+    button { padding: 5px 12px; color: var(--vscode-button-foreground); background: var(--vscode-button-background); border: 0; border-radius: 2px; cursor: pointer; }
+    button:hover { background: var(--vscode-button-hoverBackground); }
+    button:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
+    button:disabled { opacity: .7; cursor: wait; }
+    #save-status { font-size: 12px; }
+    iframe { flex: 1; width: 100%; min-height: 0; border: 0; }
   </style>
 </head>
 <body>
+  <header>
+    <button id="save-pdf" type="button">Save PDF As...</button>
+    <span id="save-status" role="status" aria-live="polite"></span>
+  </header>
   <iframe title="Quarto document preview" src="${frameUrl}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+  <script nonce="${nonce}">
+    const vscode = acquireVsCodeApi();
+    const saveButton = document.getElementById("save-pdf");
+    const status = document.getElementById("save-status");
+    saveButton.addEventListener("click", () => {
+      saveButton.disabled = true;
+      status.textContent = "Choose where to save the PDF...";
+      vscode.postMessage({ type: "savePdf" });
+    });
+    window.addEventListener("message", (event) => {
+      if (!event.data || event.data.type !== "savePdfResult") return;
+      saveButton.disabled = false;
+      status.textContent = event.data.message;
+    });
+  </script>
 </body>
 </html>`;
   } catch (error) {
@@ -199,6 +242,62 @@ async function showPreview(session: PreviewSession, previewUrl: string): Promise
     showFailure(session, `Could not open the preview inside VS Code: ${message}`);
     void vscode.window.showErrorMessage(`qmd2pdf: ${message}`);
   }
+}
+
+async function saveRenderedPdf(session: PreviewSession, sourceFile: string): Promise<void> {
+  if (session.savingPdf) {
+    return;
+  }
+  session.savingPdf = true;
+  try {
+    await fs.access(session.stagedPdf);
+  } catch (error) {
+    session.savingPdf = false;
+    if (!isMissingPath(error)) {
+      reportSaveError(session, error);
+      return;
+    }
+    session.panel.webview.postMessage({
+      type: "savePdfResult",
+      message: "The PDF is not ready yet. Wait for rendering to finish, then try again.",
+    });
+    return;
+  }
+
+  try {
+    const destination = await vscode.window.showSaveDialog({
+      defaultUri: vscode.Uri.file(
+        path.join(path.dirname(sourceFile), `${path.basename(sourceFile, path.extname(sourceFile))}.pdf`),
+      ),
+      filters: { "PDF files": ["pdf"] },
+      saveLabel: "Save PDF",
+      title: "Save Rendered PDF",
+    });
+    if (!destination) {
+      session.panel.webview.postMessage({ type: "savePdfResult", message: "Save canceled." });
+      return;
+    }
+
+    await vscode.workspace.fs.copy(vscode.Uri.file(session.stagedPdf), destination, { overwrite: true });
+    session.panel.webview.postMessage({
+      type: "savePdfResult",
+      message: `Saved PDF to ${path.basename(destination.path)}.`,
+    });
+  } catch (error) {
+    reportSaveError(session, error);
+  } finally {
+    session.savingPdf = false;
+  }
+}
+
+function reportSaveError(session: PreviewSession, error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  outputChannel.appendLine(`Could not save rendered PDF: ${message}`);
+  session.panel.webview.postMessage({
+    type: "savePdfResult",
+    message: `Could not save PDF: ${message}`,
+  });
+  void vscode.window.showErrorMessage(`qmd2pdf: could not save rendered PDF: ${message}`);
 }
 
 function stopPreview(): void {
@@ -367,6 +466,10 @@ function cleanupWorkspace(session: PreviewSession): Promise<void> {
 
 function isMissingPath(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function showFailure(session: PreviewSession, message: string): void {
