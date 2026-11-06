@@ -14,12 +14,6 @@ format:
           innerbottommargin=8pt
         ]{mybox}
 
-        \usepackage{fancyhdr}
-        \fancypagestyle{startHeader} {
-          \fancyhead[L]{Homework 7}
-          \fancyhead[C]{ESE 5720}
-          \fancyhead[R]{Shiva Prasad}
-        }
     pdf-engine: xelatex
     geometry:
       - margin=1in

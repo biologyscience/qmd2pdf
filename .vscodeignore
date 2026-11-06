@@ -1,0 +1,13 @@
+.vscode/**
+.vscodeignore
+src/**
+node_modules/**
+.quarto/**
+tsconfig.json
+package-lock.json
+file.qmd
+*.pdf
+*.tex
+*.log
+dist/**/*.map
+icon.svg

@@ -1,0 +1,311 @@
+# Problem 1
+
+::: mybox
+**a:** During evaluate ($\Phi = 1$), Y computes A.B.C
+
+- Final($V_Z$) = 0.625 V | Inital charged stored at $C_Z$ is shared among $C_Z,\ C_1,\ C_2$.
+- At this evaluation, Y should be 0. The value read at Y is also 0.
+- Margin left = 0.625 - 0.6 = 0.025 V
+:::
+
+::: mybox
+**b:** Charge @ $C_Z$: $C_Z$ / $C_Z + C_1 + C_2$
+
+At worst case,
+
+{{-2em}}
+
+$$
+\begin{aligned}
+0.8 &< \frac{C_Z}{C_Z + C_1 + C_2}\\[.5em]
+10f + C_1 + C_2 &< \frac{10f}{0.8}\\[.5em]
+C_1 + C_2 &< 2.5\ \text{fF}
+\end{aligned}
+$$
+
+::: mybox
+::: center
+Largest total internal capacitance $C_1 + C_2$ = 2.5 fF
+:::
+:::
+
+To reduce the charge sharing problem, either a keeper circuit can be implemented to avoid incorrect value at Y, or internal nodes could be precharged accordingly.
+:::
+
+::: mybox
+**c:** $\alpha_{static}$: P(0) * P(1) | $\alpha_{dynamic}$: The probability of a node to switch from 1 to 0
+
+STATIC NAND3:
+
+- P(Z=0) = P(A=1) * P(B=1) * P(C=1) = 0.125
+- P(Z=1) = 1 - P(Z=0) = 0.875
+- $\alpha_{static}$ = P(Z=0) * P(Z=1) = 0.109375
+
+STATIC NOR3 is also similar. So,
+$$
+\alpha_{NAND3} = \alpha_{NOR3} = 0.109375
+$$
+
+DYNAMIC NAND3: $\alpha_{dynamic}$ = P(A=1) * P(B=1) * P(C=1) = 0.125
+
+DYNAMIC NOR3: $\alpha_{dynamic}$ = 1 - [P(A=0) * P(B=0) * P(C=0)] = 0.875
+
+| Logic | $\alpha_{dynamic}$ | $\alpha_{static}$ |
+| :- | -: | -: |
+| NAND3 | 0.125 | 0.109375 |
+| NOR3 | 0.875 | 0.109375 |
+
+For both functions, $\alpha_{static} < \alpha_{dynamic}$ and Power $\propto\ \alpha$. Therefore, a **STATIC** implementation suits better from a power point of view.  
+:::
+
+::: mybox
+**d:** The output of the dynamic gate is held by the node's capacitance. This is unstable over time and may propogate incorrect values.
+:::
+
+# Problem 2
+
+::: mybox
+**a:** Delay available on input to register = 0.41 ns. Delay on register to output = 0.40 ns.
+
+{{-1em}}
+
+```tcl
+create_clock -name clk -period 0.8 -waveform {0 0.4} [get_ports clk]
+set_clock_uncertainty -setup 0.05 [get_clocks clk]
+set_clock_uncertainty -hold  0.02 [get_clocks clk]
+set_input_delay  0.30 -clock clk
+set_output_delay 0.25 -clock clk [all_outputs]
+```
+:::
+
+::: mybox
+**b:**
+
+{{-2em}}
+
+i. Slack = $T − t_{unc} − t_{pcq} − t_{pd} − t_{setup} = 0.8 − 0.05 − 0.10 − 1.3 − 0.04 =$ −0.69 ns (violating)
+ii. ```set_multicycle_path 2 -setup -from [get_cells R1] -to [get_cells R2]```
+iii. Hold Slack = $t_{ccq} + t_{cd} − t_{hold} − t_{unc} = 0.10 + 0.2 − 0.02 − 0.02 =$ +0.26 ns 
+:::
+
+::: mybox
+**c:**
+
+**(i) Nominal delays**
+
+- Launch clock latency = 0.12 + 0.06 = 0.18 ns
+- Capture clock latency = 0.12 + 0.05 = 0.17 ns
+- Slack = (1.0 + 0.17) − (0.18 + 0.90) − 0.05 = 1.17 − 1.08 − 0.05 = +0.04 ns
+
+**(ii) OCV derates, no CRPR**
+
+- Launch clock = 0.18 × 1.08 = 0.1944 ns
+- Data (clk-to-Q + logic) = 0.90 × 1.08 = 0.9720 ns
+- Capture clock = 0.17 × 0.92 = 0.1564 ns
+- Slack = (1.0 + 0.1564) − (0.1944 + 0.9720) − 0.05 = 1.1564 − 1.1664 − 0.05 = −0.060 ns (violating)
+  
+**(iii) OCV with CRPR**
+
+- CRPR = 0.1296 − 0.1104 = 0.0192 ns
+- Slack = −0.060 + 0.0192 = −0.0408 ns
+:::
+
+{{< pagebreak >}}
+
+# Problem 3
+
+::: mybox
+**a:** $f(a,b,c,d) = \sum m(0, 4, 5, 7, 10, 11, 13, 15)$
+
+::: {.row split=0.5}
+::: left
+| Ones | Minterm | abcd |
+|------|---------|------|
+| 0 | 0  | 0000 |
+| 1 | 4  | 0100 |
+| 2 | 5  | 0101 |
+| 2 | 10 | 1010 |
+| 3 | 7  | 0111 |
+| 3 | 11 | 1011 |
+| 3 | 13 | 1101 |
+| 4 | 15 | 1111 |
+:::
+::: right
+| PI | Minterms | Term |
+|----|----------|------|
+| P1 | 0, 4         | a'c'd' |
+| P2 | 4, 5         | a'bc'  |
+| P3 | 10, 11       | ab'c   |
+| P4 | 11, 15       | acd    |
+| P5 | 5, 7, 13, 15 | bd     |
+:::
+:::
+
+{{-1em}}
+
+::: center
+Prime implicants
+:::
+
+{{-1em}}
+
+| PI | 0 | 4 | 5 | 7 | 10 | 11 | 13 | 15 |
+|----|---|---|---|---|----|----|----|----|
+| P1: a'c'd' | **X** | X | | | | | | |
+| P2: a'bc'  | | X | X | | | | | |
+| P3: ab'c   | | | | | **X** | X | | |
+| P4: acd    | | | | | | X | | X |
+| P5: bd     | | | X | **X** | | | **X** | X |
+
+- m0 is covered only by P1, so **P1 (a'c'd')** is essential.
+- m7 and m13 are covered only by P5, so **P5 (bd)** is essential.
+- m10 is covered only by P3, so **P3 (ab'c)** is essential.
+
+Minimum SOP: **f = a'c'd' + bd + ab'c** | 3 product terms, 3 + 2 + 3 = **8 literals**.
+
+| Form | Product terms | Literals |
+|------|---------------|----------|
+| Canonical (minterm) | 8 | 8 × 4 = 32 |
+| Minimum SOP | 3 | 8 |
+| Reduction | ~62% | 75% |
+:::
+
+::: mybox
+**b:** $(ac + ad + ae + bc + bd + be + g) \div (a + b)$
+
+- Quotient: $c + d + e$
+- Remainder: $g$
+- Factored form: $(a + b) . (c + d + e) + g$
+
+| | Literal Count |
+| :-: | :-: |
+| Before | 13 |
+| After | 6 |
+
+Factoring a combinational logic typically **increases** the logic levels in the path. While reducing the *number of literals and gates*.
+:::
+
+{{< pagebreak >}}
+
+# Problem 4
+
+*Assuming the question means: $t_{pcq},\ t_{setup}$ = 0.5ns*
+
+::: mybox
+**a:** Minimum clock period as drawn: Longest Delay + $t_{setup}$ = 3 + 5 + 6 + 0.5 = 14.5 ns
+
+- To minmize it, the path should be:
+
+{{-1.5em}}
+
+::: center
+**R0** $\rightarrow$ 3ns $\rightarrow$ 5ns $\rightarrow$ **R1** $\rightarrow$ 6ns $\rightarrow$ 2ns $\rightarrow$ **R2** $\rightarrow$ 4ns $\rightarrow$ 4ns $\rightarrow$ **R3**
+
+This way, the minimum clock period is 8 + 0.5 = **8.5 ns**
+:::
+
+| | Before | After |
+| :- | -: | -: |
+| Latency (cycles) | 4 | 4 | 
+| Latency (ns) | 58 | 34 |
+:::
+
+::: mybox
+**b:** A 2-input gate requires **two** inputs to provide an output. Moving **one** register behind the gate can only provide one of the input that the gate needs. In general, for a **N** input gate, moving a register behind basically means adding **N** parallel registers behind the gate and removing **1** register which is in front of it.
+
+*A feedback loop contains 16 ns of logic and two registers.*\
+The best period retiming can reach for this loop = 16 ns + $t_{setup}$
+:::
+
+# Problem 5
+
+::: mybox
+**a:** Logically: n = AB, Z = AB + C $\rightarrow$ @ ABC = 110 $\rightarrow$ Z = 1
+
+| Nets | Faults |
+| :-: | :- |
+| A | A/SA0, A/SA1 |
+| B | B/SA0, B/SA1 |
+| C | C/SA0, C/SA1 |
+
+::: center
+ABC = 110
+
+| | Z should be | But Z is | Fault? |
+| :-: | -: | -: | :-: |
+| A/SA0 | 1 | 0 | No |
+| A/SA1 | 1 | 1 | Yes |
+| B/SB0 | 1 | 0 | No |
+| B/SB1 | 1 | 1 | Yes |
+| C/SC0 | 1 | 1 | No |
+| C/SC1 | 1 | 1 | No |
+
+Fault coverage = #Yes / #(Yes + No) = 2/8 = 25%
+:::
+:::
+
+::: mybox
+**b:** Williams-Brown model: DL = $1 - Y^{1 - T}$
+
+@ Y = 60% and T = 99%, DL = $1 - 0.6^{1 - 0.99}$ = 0.00509 $\approx$ 5095 DPPM
+
+{{1em}}
+
+For 100 DPPM,
+
+$$
+\begin{aligned}
+\text{100 DPPM} &= 1 - 0.6^{1 - T}\\
+10^{-4} &= 1 - 0.6^{1 - T}\\
+0.6^{1 - T} &= 0.9999\\
+(1 - T) \ln(0.6) &= \ln(0.9999)\\
+1 - T &= 0.0001957\\[1em]
+T &= 0.9998 = 99.98%
+\end{aligned}
+$$
+:::
+
+::: mybox
+**c:** Test time per die = #(cycles required for shifting) * #(shifting pattern) * Clock Period
+
+$$
+\begin{aligned}
+&= (\frac{2 \times 10^6}{200} + 1) \times 15000 \times \frac{1}{\text{25 M}}\\
+&= (10000 + 1) (15000) (40n)\\[1em]
+&= 6.0006\ s
+\end{aligned}
+$$
+
+Bringing down this time to 1s means a 6x reduction in the current time. This requies a 6x increase in the number of balanced chains $\approx$ 1200 chains.
+
+To test all these 1200 chains, 2400 IO pins are required, which is highly impractical for a typical chip.
+:::
+
+::: mybox
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+
+k = 1.380649e-23
+T = 300
+
+gamma = 2 / 3
+gm = 2e-3
+RL = 5e3
+Cin = 100e-10
+
+f = np.logspace(0, 9, 500)
+
+vn2 = 4 * k * T * (gamma / gm + 1 / (gm**2 * RL))
+in2 = vn2 * (2 * np.pi * f * Cin) ** 2
+
+plt.figure(figsize=(7, 2))
+plt.semilogx(f, in2, lw=2)
+plt.xlabel("Frequency (Hz)")
+plt.ylabel(r"$i_{n,in}^2$ (A$^2$/Hz)")
+plt.yticks([])
+plt.grid(True, which="both", ls=":", alpha=0.6)
+plt.xlim(10**0, 10**9)
+plt.show()
+```
+:::

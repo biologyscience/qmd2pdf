@@ -1,3 +1,89 @@
 {
-    "main": "main.js"
+  "name": "qmd2pdf",
+  "displayName": "qmd2pdf",
+  "description": "Open Quarto QMD files with a live preview using their project configuration.",
+  "version": "1.0.0",
+  "publisher": "biologyscience",
+  "license": "MIT",
+  "icon": "icon.png",
+  "repository": {
+    "url": "https://github.com/biologyscience/qmd2pdf"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:qmd2pdf.startPreview",
+    "onCommand:qmd2pdf.stopPreview",
+    "onCommand:qmd2pdf.openConfigFiles"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "qmd2pdf.startPreview",
+        "title": "qmd2pdf: Start Live Preview",
+        "category": "Quarto"
+      },
+      {
+        "command": "qmd2pdf.stopPreview",
+        "title": "qmd2pdf: Stop Live Preview",
+        "category": "Quarto"
+      },
+      {
+        "command": "qmd2pdf.openConfigFiles",
+        "title": "qmd2pdf: Open Preview Config Files",
+        "category": "Quarto"
+      }
+    ],
+    "configuration": {
+      "title": "qmd2pdf",
+      "properties": {
+        "qmd2pdf.configDirectory": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "markdownDescription": "Directory containing the extension-wide `_quarto.yaml` and `filter.lua`. Leave blank to use editable copies in the extension's global storage. Run **qmd2pdf: Open Preview Config Files** to open them."
+        },
+        "qmdLivePreview.configDirectory": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "deprecationMessage": "Use qmd2pdf.configDirectory instead.",
+          "markdownDescription": "Legacy setting retained for compatibility with the QMD Live Preview extension."
+        }
+      }
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "qmd2pdf.startPreview",
+          "when": "resourceExtname == .qmd",
+          "group": "navigation",
+          "icon": "$(play)"
+        },
+        {
+          "command": "qmd2pdf.stopPreview",
+          "when": "resourceExtname == .qmd",
+          "group": "navigation",
+          "icon": "$(debug-stop)"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "npm run compile && vsce package",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.6.0",
+    "typescript": "^5.8.0"
+  }
 }
