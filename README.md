@@ -4,8 +4,11 @@
   <img src="./icon.png" alt="qmd2pdf extension icon" width="128">
 </p>
 
-This VS Code extension renders the active `.qmd` file to PDF and displays it
-in a VS Code editor beside the document. Each saved QMD or changed project
+A simple VS Code extension to go from `.qmd` to `.pdf` with live updates (like [Overleaf](https://www.overleaf.com/))
+
+![](example.png)
+
+<!-- Each saved QMD or changed project
 YAML/Lua configuration triggers a fresh `quarto render`; the preview updates
 when the new PDF is ready. The preview has page navigation, selectable PDF
 text, and zoom controls. It renders all pages and starts the PDF.js worker
@@ -15,13 +18,17 @@ new render replaces the PDF, the preview keeps your current page and relative
 scroll position within that page, both horizontal and vertical scroll
 positions, and your zoom level.
 While Quarto renders, the preview shows a live log overlay. It closes when
-rendering succeeds and remains open with the error output if rendering fails.
+rendering succeeds and remains open with the error output if rendering fails. -->
 
 ## Requirements
 
 - [Quarto](https://quarto.org/docs/get-started/) installed and available as
   `quarto` on `PATH`.
 - A saved `.qmd` file.
+
+## Install
+
+Download the latest `.vsix` file from the main branch and install it as an extension in VS Code
 
 ## Use
 
@@ -38,8 +45,7 @@ copies saved QMD changes and project configuration changes into that copy,
 then runs `quarto render <file.qmd>` there. Generated files stay in the
 temporary copy, leaving the original project untouched. Unsaved edits do not
 trigger a render. Project settings, Lua filters, and other project files are
-copied too; common generated and dependency directories are excluded. The
-temporary copy is removed when the preview closes.
+copied too; common generated and dependency directories are excluded.
 
 Project-local `_quarto.yaml` (or `_quarto.yml`) and `filter.lua` are preserved
 and used when present. The extension supplies its global YAML or Lua filter
