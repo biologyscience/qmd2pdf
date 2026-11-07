@@ -16,3 +16,9 @@ for (const [source, destination] of [
 for (const directory of ["cmaps", "standard_fonts", "wasm"]) {
   fs.cpSync(path.join(sourceRoot, directory), path.join(destinationRoot, directory), { recursive: true });
 }
+
+fs.cpSync(
+  path.join(__dirname, "..", "webview"),
+  path.join(__dirname, "..", "dist", "webview"),
+  { recursive: true },
+);

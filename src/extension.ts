@@ -85,13 +85,14 @@ async function startPreview(context: vscode.ExtensionContext): Promise<void> {
   }
 
   const pdfjsDirectory = vscode.Uri.file(path.join(context.extensionUri.fsPath, "dist", "pdfjs"));
+  const webviewDirectory = vscode.Uri.file(path.join(context.extensionUri.fsPath, "dist", "webview"));
   const panel = vscode.window.createWebviewPanel(
     "qmd2pdf",
     `qmd2pdf: ${path.basename(file)}`,
     vscode.ViewColumn.Beside,
     {
       enableScripts: true,
-      localResourceRoots: [vscode.Uri.file(workspaceDirectory), pdfjsDirectory],
+      localResourceRoots: [vscode.Uri.file(workspaceDirectory), pdfjsDirectory, webviewDirectory],
     },
   );
 
@@ -158,15 +159,7 @@ async function startPreview(context: vscode.ExtensionContext): Promise<void> {
       return;
     }
 
-    const pdfModuleUri = panel.webview.asWebviewUri(vscode.Uri.file(path.join(pdfjsDirectory.fsPath, "pdf.mjs")));
-    const pdfWorkerUri = panel.webview.asWebviewUri(vscode.Uri.file(path.join(pdfjsDirectory.fsPath, "pdf.worker.mjs")));
-    const pdfAssetUri = `${panel.webview.asWebviewUri(pdfjsDirectory).toString().replace(/\/$/, "")}/`;
-    panel.webview.html = pdfPreviewHtml(
-      panel.webview,
-      pdfModuleUri.toString(),
-      pdfWorkerUri.toString(),
-      pdfAssetUri,
-    );
+    panel.webview.html = await loadPreviewHtml(panel.webview, context.extensionUri.fsPath);
 
     panel.webview.onDidReceiveMessage(async (message: unknown) => {
       if (!isRecord(message)) {
@@ -305,444 +298,33 @@ function postRenderedPdf(session: PreviewSession): void {
   });
 }
 
-function pdfPreviewHtml(
-  webview: vscode.Webview,
-  pdfModuleUri: string,
-  pdfWorkerUri: string,
-  pdfAssetUri: string,
-): string {
+async function loadPreviewHtml(webview: vscode.Webview, extensionPath: string): Promise<string> {
+  const webviewDirectory = path.join(extensionPath, "dist", "webview");
+  const stylesheetUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDirectory, "preview.css")));
+  const scriptUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDirectory, "preview.js")));
+  const pdfjsDirectory = path.join(extensionPath, "dist", "pdfjs");
+  const pdfModuleUri = webview.asWebviewUri(vscode.Uri.file(path.join(pdfjsDirectory, "pdf.mjs")));
+  const pdfWorkerUri = webview.asWebviewUri(vscode.Uri.file(path.join(pdfjsDirectory, "pdf.worker.mjs")));
+  const pdfAssetUri = webview.asWebviewUri(vscode.Uri.file(pdfjsDirectory)).toString().replace(/\/$/, "") + "/";
   const nonce = randomBytes(16).toString("base64");
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}' ${webview.cspSource}; worker-src ${webview.cspSource} blob:; style-src ${webview.cspSource} 'unsafe-inline'; img-src data: blob:; font-src ${webview.cspSource} data:; connect-src ${webview.cspSource};">
-  <title>qmd2pdf PDF Preview</title>
-  <style>
-    html, body { height: 100%; margin: 0; }
-    body { display: flex; flex-direction: column; overflow: hidden; color: var(--vscode-foreground); background: var(--vscode-editor-background); font-family: var(--vscode-font-family); }
-    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--vscode-panel-border); }
-    button, select, input { min-height: 28px; color: var(--vscode-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 2px; }
-    button { padding: 3px 9px; cursor: pointer; }
-    button:hover:not(:disabled) { background: var(--vscode-toolbar-hoverBackground); }
-    button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
-    button:disabled { opacity: .6; cursor: wait; }
-    select { padding: 2px 6px; }
-    input { box-sizing: border-box; width: 52px; padding: 2px 5px; text-align: center; }
-    .separator { height: 22px; border-left: 1px solid var(--vscode-panel-border); }
-    #status { font-size: 12px; }
-    #pages { flex: 1; overflow: auto; padding: 16px; scroll-behavior: smooth; }
-    .page { position: relative; width: min(100%, 816px); aspect-ratio: 612 / 792; margin: 0 auto 16px; background: white; box-shadow: 0 1px 5px #0005; }
-    .page canvas { display: block; }
-    .text-layer { position: absolute; inset: 0; overflow: hidden; line-height: 1; transform-origin: 0 0; z-index: 1; }
-    .text-layer span, .text-layer br { position: absolute; color: transparent; white-space: pre; transform-origin: 0 0; user-select: text; }
-    .text-layer > :not(.markedContent), .text-layer .markedContent span:not(.markedContent) { font-size: calc(var(--total-scale-factor) * var(--font-height)); transform: rotate(var(--rotate, 0deg)) scaleX(var(--scale-x, 1)); }
-    .text-layer ::selection { background: rgb(0 100 255 / 30%); color: transparent; }
-  </style>
-</head>
-<body>
-  <header>
-    <button id="previous-page" type="button" aria-label="Previous page" disabled>‹</button>
-    <input id="page-number" type="number" min="1" value="1" aria-label="Current page" disabled>
-    <span id="page-count" aria-label="Total pages">/ —</span>
-    <button id="next-page" type="button" aria-label="Next page" disabled>›</button>
-    <span class="separator" aria-hidden="true"></span>
-    <button id="zoom-out" type="button" aria-label="Zoom out" disabled>−</button>
-    <select id="zoom-level" aria-label="Zoom level" disabled>
-      <option value="50">50%</option><option value="75">75%</option>
-      <option value="100" selected>Fit width</option><option value="125">125%</option>
-      <option value="150">150%</option><option value="200">200%</option><option value="300">300%</option>
-    </select>
-    <button id="zoom-in" type="button" aria-label="Zoom in" disabled>+</button>
-    <span class="separator" aria-hidden="true"></span>
-    <button id="save-pdf" type="button" disabled>Save PDF As...</button>
-    <span id="status" role="status" aria-live="polite">Waiting for the first render...</span>
-  </header>
-  <main id="pages" aria-label="PDF pages. Use Page Up and Page Down to navigate." tabindex="0"></main>
-  <script type="module" nonce="${nonce}">
-    import * as pdfjsLib from "${pdfModuleUri}";
-    const vscode = acquireVsCodeApi();
-    const saveButton = document.getElementById("save-pdf");
-    const status = document.getElementById("status");
-    const pages = document.getElementById("pages");
-    const pageNumberInput = document.getElementById("page-number");
-    const pageCount = document.getElementById("page-count");
-    const previousPageButton = document.getElementById("previous-page");
-    const nextPageButton = document.getElementById("next-page");
-    const zoomSelect = document.getElementById("zoom-level");
-    const zoomOutButton = document.getElementById("zoom-out");
-    const zoomInButton = document.getElementById("zoom-in");
-    let documentVersion = 0;
-    let renderVersion = 0;
-    let hasPdf = false;
-    let pdfDocument;
-    let loadingTask;
-    let zoomPercent = 100;
-    let activePage = 1;
-    let pendingScrollAnchor;
-    const pageViews = new Map();
-    const renderTasks = new Map();
-    const renderingPages = new Map();
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "${pdfWorkerUri}";
-    const pdfWorker = new pdfjsLib.PDFWorker({ name: "qmd2pdf" });
-    const pdfWorkerReady = pdfWorker.promise;
-    pdfWorkerReady.catch(() => {});
-
-    function updatePageControls() {
-      if (!pdfDocument) return;
-      pageNumberInput.value = String(activePage);
-      pageNumberInput.max = String(pdfDocument.numPages);
-      pageCount.textContent = "/ " + pdfDocument.numPages;
-      previousPageButton.disabled = activePage <= 1;
-      nextPageButton.disabled = activePage >= pdfDocument.numPages;
+  const csp = `default-src 'none'; script-src 'nonce-${nonce}' ${webview.cspSource}; worker-src ${webview.cspSource} blob:; style-src ${webview.cspSource}; img-src data: blob:; font-src ${webview.cspSource} data:; connect-src ${webview.cspSource};`;
+  const html = await fs.readFile(path.join(webviewDirectory, "preview.html"), "utf8");
+  const replacements: Record<string, string> = {
+    "{{csp}}": csp,
+    "{{cssUri}}": stylesheetUri.toString(),
+    "{{nonce}}": nonce,
+    "{{scriptUri}}": scriptUri.toString(),
+    "{{pdfModuleUri}}": pdfModuleUri.toString(),
+    "{{pdfWorkerUri}}": pdfWorkerUri.toString(),
+    "{{pdfAssetUri}}": pdfAssetUri,
+  };
+  return html.replace(/{{[A-Za-z]+}}/g, (placeholder) => {
+    const value = replacements[placeholder];
+    if (!value) {
+      throw new Error(`Missing preview HTML value for ${placeholder}.`);
     }
-
-    function updateZoomButtons() {
-      const zoomOptions = [...zoomSelect.options];
-      const index = zoomOptions.findIndex((option) => Number(option.value) === zoomPercent);
-      zoomSelect.value = String(zoomPercent);
-      zoomOutButton.disabled = index <= 0;
-      zoomInButton.disabled = index < 0 || index >= zoomOptions.length - 1;
-    }
-
-    function captureScrollAnchor() {
-      if (!pdfDocument) return undefined;
-      const containerRect = pages.getBoundingClientRect();
-      const viewportOffset = Math.min(24, pages.clientHeight / 4);
-      const anchorY = containerRect.top + viewportOffset;
-      let closestPage;
-      let closestDistance = Infinity;
-
-      for (const [pageNumber, view] of pageViews) {
-        const rect = view.element.getBoundingClientRect();
-        const distance = anchorY < rect.top
-          ? rect.top - anchorY
-          : anchorY > rect.bottom
-            ? anchorY - rect.bottom
-            : 0;
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestPage = { pageNumber, rect };
-        }
-        if (distance === 0) break;
-      }
-
-      if (!closestPage || closestPage.rect.height <= 0) return undefined;
-      return {
-        pageNumber: closestPage.pageNumber,
-        pageFraction: Math.max(0, Math.min(
-          1,
-          (anchorY - closestPage.rect.top) / closestPage.rect.height,
-        )),
-        viewportOffset,
-      };
-    }
-
-    function restoreScrollAnchor(pdf) {
-      if (!pendingScrollAnchor || pdf !== pdfDocument) return;
-      const anchor = pendingScrollAnchor;
-      pendingScrollAnchor = undefined;
-      const pageNumber = Math.min(anchor.pageNumber, pdf.numPages);
-      const view = pageViews.get(pageNumber);
-      if (!view) return;
-
-      const containerRect = pages.getBoundingClientRect();
-      const pageRect = view.element.getBoundingClientRect();
-      const pageTop = pages.scrollTop + pageRect.top - containerRect.top;
-      const targetScrollTop = pageTop + pageRect.height * anchor.pageFraction - anchor.viewportOffset;
-      const previousScrollBehavior = pages.style.scrollBehavior;
-      pages.style.scrollBehavior = "auto";
-      pages.scrollTop = Math.max(0, targetScrollTop);
-      window.requestAnimationFrame(() => {
-        pages.style.scrollBehavior = previousScrollBehavior;
-      });
-
-      activePage = pageNumber;
-      updatePageControls();
-    }
-
-    function goToPage(pageNumber) {
-      if (!pdfDocument) return;
-      activePage = Math.max(1, Math.min(pdfDocument.numPages, Math.trunc(pageNumber) || 1));
-      createPageView(activePage, pdfDocument);
-      pageViews.get(activePage)?.element.scrollIntoView({ block: "start" });
-      updatePageControls();
-      renderPage(activePage);
-    }
-
-    function setZoom(value) {
-      const options = [...zoomSelect.options].map((option) => Number(option.value));
-      const nextZoom = Math.max(options[0], Math.min(options[options.length - 1], value));
-      if (nextZoom === zoomPercent) return;
-      zoomPercent = nextZoom;
-      refreshVisiblePages();
-      updateZoomButtons();
-    }
-
-    function refreshVisiblePages() {
-      renderVersion++;
-      for (const [pageNumber, task] of renderTasks) {
-        task.cancel();
-        renderTasks.delete(pageNumber);
-      }
-      for (const view of pageViews.values()) {
-        view.renderedZoom = 0;
-        view.textLayerRenderer?.cancel();
-        view.textLayer.replaceChildren();
-        view.canvas.width = 0;
-        view.canvas.height = 0;
-      }
-      if (pdfDocument) void renderAllPages(pdfDocument);
-    }
-
-    async function renderPage(pageNumber) {
-      const view = pageViews.get(pageNumber);
-      const doc = pdfDocument;
-      const version = renderVersion;
-      if (!view || !doc || renderingPages.has(pageNumber) || view.renderedZoom === zoomPercent) return;
-      renderingPages.set(pageNumber, version);
-      let renderTask;
-      try {
-        const page = await doc.getPage(pageNumber);
-        if (doc !== pdfDocument || version !== renderVersion) return;
-
-        const baseViewport = page.getViewport({ scale: 1 });
-        const availableWidth = Math.max(200, pages.clientWidth - 48);
-        const scale = (availableWidth / baseViewport.width) * (zoomPercent / 100);
-        const viewport = page.getViewport({ scale });
-        const outputScale = Math.min(window.devicePixelRatio || 1, 3);
-        view.element.style.width = Math.ceil(viewport.width) + "px";
-        view.element.style.height = Math.ceil(viewport.height) + "px";
-        view.element.style.aspectRatio = "auto";
-        view.canvas.width = Math.ceil(viewport.width * outputScale);
-        view.canvas.height = Math.ceil(viewport.height * outputScale);
-        view.canvas.style.width = Math.ceil(viewport.width) + "px";
-        view.canvas.style.height = Math.ceil(viewport.height) + "px";
-
-        renderTask = page.render({
-          canvas: view.canvas,
-          viewport,
-          transform: outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null,
-        });
-        renderTasks.set(pageNumber, renderTask);
-        await renderTask.promise;
-        if (doc === pdfDocument && version === renderVersion) {
-          view.renderedZoom = zoomPercent;
-          if (pageNumber === 1) {
-            status.textContent = "PDF displayed";
-          }
-          view.textLayer.style.setProperty("--total-scale-factor", String(scale * (96 / 72)));
-          view.textLayerRenderer = new pdfjsLib.TextLayer({
-            textContentSource: page.streamTextContent({ includeMarkedContent: true }),
-            container: view.textLayer,
-            viewport,
-          });
-          view.textLayerRenderer.render().catch((error) => {
-            if (error?.name !== "AbortException") {
-              status.textContent = "Could not load selectable text for page " + pageNumber + ".";
-            }
-          });
-        }
-      } catch (error) {
-        if (error?.name !== "RenderingCancelledException") {
-          status.textContent = "Could not render page " + pageNumber + ": " + (error instanceof Error ? error.message : String(error));
-        }
-      } finally {
-        if (renderTasks.get(pageNumber) === renderTask) {
-          renderTasks.delete(pageNumber);
-        }
-        if (renderingPages.get(pageNumber) === version) {
-          renderingPages.delete(pageNumber);
-        }
-        if (doc === pdfDocument && version !== renderVersion) {
-          window.requestAnimationFrame(() => renderPage(pageNumber));
-        }
-      }
-    }
-
-    function createPageView(pageNumber, pdf) {
-      if (pageViews.has(pageNumber) || pdf !== pdfDocument) return;
-      const element = document.createElement("section");
-      element.className = "page";
-      element.dataset.page = String(pageNumber);
-      element.setAttribute("aria-label", "Page " + pageNumber);
-      const canvas = document.createElement("canvas");
-      const textLayer = document.createElement("div");
-      textLayer.className = "text-layer";
-      element.append(canvas, textLayer);
-      pages.append(element);
-      pageViews.set(pageNumber, { element, canvas, textLayer, renderedZoom: 0 });
-    }
-
-    async function renderAllPages(pdf) {
-      if (pdf !== pdfDocument) return;
-      const currentVersion = renderVersion;
-      const pageNumbers = Array.from({ length: pdf.numPages }, (_, index) => index + 1);
-      await Promise.all(pageNumbers.map((pageNumber) => renderPage(pageNumber)));
-      if (pdf === pdfDocument && currentVersion === renderVersion) {
-        restoreScrollAnchor(pdf);
-        status.textContent = "PDF displayed (" + pdf.numPages + (pdf.numPages === 1 ? " page)." : " pages).");
-      }
-    }
-
-    async function showPdf(url) {
-      if (!pendingScrollAnchor) {
-        pendingScrollAnchor = captureScrollAnchor();
-      }
-      const currentVersion = ++documentVersion;
-      renderVersion++;
-      const previousLoadingTask = loadingTask;
-      loadingTask = undefined;
-      for (const task of renderTasks.values()) task.cancel();
-      renderTasks.clear();
-      renderingPages.clear();
-      for (const view of pageViews.values()) {
-        view.textLayerRenderer?.cancel();
-      }
-      pdfDocument = undefined;
-      pageViews.clear();
-      pages.replaceChildren();
-      pageNumberInput.disabled = true;
-      previousPageButton.disabled = true;
-      nextPageButton.disabled = true;
-      zoomSelect.disabled = true;
-      zoomOutButton.disabled = true;
-      zoomInButton.disabled = true;
-      status.textContent = "Loading PDF...";
-      try {
-        await previousLoadingTask?.destroy();
-        if (currentVersion !== documentVersion) return;
-        await pdfWorkerReady;
-        if (currentVersion !== documentVersion) return;
-        loadingTask = pdfjsLib.getDocument({
-          url,
-          worker: pdfWorker,
-          cMapUrl: "${pdfAssetUri}cmaps/",
-          cMapPacked: true,
-          standardFontDataUrl: "${pdfAssetUri}standard_fonts/",
-          wasmUrl: "${pdfAssetUri}wasm/",
-        });
-        const pdf = await loadingTask.promise;
-        if (currentVersion !== documentVersion) {
-          await pdf.destroy();
-          return;
-        }
-        pdfDocument = pdf;
-        hasPdf = true;
-        activePage = 1;
-        pages.replaceChildren();
-        pageViews.clear();
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-          createPageView(pageNumber, pdf);
-        }
-        pageNumberInput.disabled = false;
-        zoomSelect.disabled = false;
-        zoomPercent = 100;
-        updateZoomButtons();
-        updatePageControls();
-        saveButton.disabled = false;
-        status.textContent = "Rendering PDF pages...";
-        void renderAllPages(pdf);
-      } catch (error) {
-        if (currentVersion !== documentVersion) return;
-        saveButton.disabled = !hasPdf;
-        status.textContent = "Could not display PDF: " + (error instanceof Error ? error.message : String(error));
-      }
-    }
-
-    previousPageButton.addEventListener("click", () => goToPage(activePage - 1));
-    nextPageButton.addEventListener("click", () => goToPage(activePage + 1));
-    pageNumberInput.addEventListener("change", () => goToPage(Number(pageNumberInput.value)));
-    zoomSelect.addEventListener("change", () => setZoom(Number(zoomSelect.value)));
-    zoomOutButton.addEventListener("click", () => {
-      const options = [...zoomSelect.options].map((option) => Number(option.value));
-      setZoom(options[Math.max(0, options.indexOf(zoomPercent) - 1)]);
-    });
-    zoomInButton.addEventListener("click", () => {
-      const options = [...zoomSelect.options].map((option) => Number(option.value));
-      setZoom(options[Math.min(options.length - 1, options.indexOf(zoomPercent) + 1)]);
-    });
-    pages.addEventListener("wheel", (event) => {
-      if (event.ctrlKey || event.metaKey) {
-        event.preventDefault();
-        const options = [...zoomSelect.options].map((option) => Number(option.value));
-        const index = options.indexOf(zoomPercent);
-        setZoom(options[Math.max(0, Math.min(options.length - 1, index + (event.deltaY < 0 ? 1 : -1)))]);
-      }
-    }, { passive: false });
-    pages.addEventListener("scroll", () => {
-      window.requestAnimationFrame(() => {
-        const bounds = pages.getBoundingClientRect();
-        const center = bounds.top + bounds.height / 2;
-        let nearestPage;
-        let nearestDistance = Infinity;
-        for (const [page, view] of pageViews) {
-          const rect = view.element.getBoundingClientRect();
-          if (rect.bottom <= bounds.top || rect.top >= bounds.bottom) continue;
-          const distance = Math.abs((rect.top + rect.bottom) / 2 - center);
-          if (distance < nearestDistance) {
-            nearestDistance = distance;
-            nearestPage = page;
-          }
-        }
-        if (nearestPage) {
-          activePage = nearestPage;
-          updatePageControls();
-        }
-      });
-    }, { passive: true });
-    let resizeTimer;
-    window.addEventListener("resize", () => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        if (pdfDocument) refreshVisiblePages();
-      }, 120);
-    });
-    pages.addEventListener("keydown", (event) => {
-      if (event.key === "PageDown" || event.key === "ArrowDown") {
-        event.preventDefault();
-        goToPage(activePage + 1);
-      } else if (event.key === "PageUp" || event.key === "ArrowUp") {
-        event.preventDefault();
-        goToPage(activePage - 1);
-      } else if (event.key === "+" || event.key === "=") {
-        const options = [...zoomSelect.options].map((option) => Number(option.value));
-        setZoom(options[Math.min(options.length - 1, options.indexOf(zoomPercent) + 1)]);
-      } else if (event.key === "-") {
-        const options = [...zoomSelect.options].map((option) => Number(option.value));
-        setZoom(options[Math.max(0, options.indexOf(zoomPercent) - 1)]);
-      }
-    });
-    window.addEventListener("unload", () => {
-      void loadingTask?.destroy();
-      pdfWorker.destroy();
-    });
-
-    saveButton.addEventListener("click", () => {
-      saveButton.disabled = true;
-      status.textContent = "Choose where to save the PDF...";
-      vscode.postMessage({ type: "savePdf" });
-    });
-    window.addEventListener("message", (event) => {
-      const message = event.data;
-      if (!message) return;
-      if (message.type === "loadPdf") {
-        showPdf(message.url);
-      } else if (message.type === "renderStatus") {
-        status.textContent = message.message;
-      } else if (message.type === "renderError") {
-        saveButton.disabled = !hasPdf;
-        status.textContent = message.message;
-      } else if (message.type === "savePdfResult") {
-        saveButton.disabled = false;
-        status.textContent = message.message;
-      }
-    });
-    vscode.postMessage({ type: "ready" });
-  </script>
-</body>
-</html>`;
+    return escapeHtml(value);
+  });
 }
 
 async function saveRenderedPdf(session: PreviewSession, sourceFile: string): Promise<void> {

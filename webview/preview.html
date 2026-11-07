@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="{{csp}}">
+  <title>qmd2pdf PDF Preview</title>
+  <link rel="stylesheet" href="{{cssUri}}">
+</head>
+<body data-pdf-module="{{pdfModuleUri}}" data-pdf-worker="{{pdfWorkerUri}}" data-pdf-assets="{{pdfAssetUri}}">
+  <header>
+    <button id="previous-page" type="button" aria-label="Previous page" disabled>‹</button>
+    <input id="page-number" type="number" min="1" value="1" aria-label="Current page" disabled>
+    <span id="page-count" aria-label="Total pages">/ —</span>
+    <button id="next-page" type="button" aria-label="Next page" disabled>›</button>
+    <span class="separator" aria-hidden="true"></span>
+    <button id="zoom-out" type="button" aria-label="Zoom out" disabled>−</button>
+    <select id="zoom-level" aria-label="Zoom level" disabled>
+      <option value="50">50%</option><option value="75">75%</option>
+      <option value="100" selected>Fit width</option><option value="125">125%</option>
+      <option value="150">150%</option><option value="200">200%</option><option value="300">300%</option>
+    </select>
+    <button id="zoom-in" type="button" aria-label="Zoom in" disabled>+</button>
+    <span class="separator" aria-hidden="true"></span>
+    <button id="save-pdf" type="button" disabled>Save PDF As...</button>
+    <span id="status" role="status" aria-live="polite">Waiting for the first render...</span>
+  </header>
+  <main id="pages" aria-label="PDF pages. Use Page Up and Page Down to navigate." tabindex="0"></main>
+  <script type="module" nonce="{{nonce}}" src="{{scriptUri}}"></script>
+</body>
+</html>

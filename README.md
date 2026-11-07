@@ -12,7 +12,8 @@ text, and zoom controls. It renders all pages and starts the PDF.js worker
 while Quarto is rendering, reducing PDF viewer startup work. Use the toolbar or Ctrl/Cmd
 plus the mouse wheel to zoom; use Page Up/Down to move between pages. When a
 new render replaces the PDF, the preview keeps your current page and relative
-scroll position within that page.
+scroll position within that page, both horizontal and vertical scroll
+positions, and your zoom level.
 
 ## Requirements
 
@@ -53,7 +54,8 @@ first use.
 ## Development
 
 Run `npm install` and `npm run compile`, then press F5 in VS Code to launch an
-Extension Development Host.
+Extension Development Host. The preview UI is maintained in `webview/` and
+copied into the extension build during compilation.
 
 To create a local installable `.vsix` package, run `npm install` and
 `npm run package`. Install the resulting `.vsix` from
