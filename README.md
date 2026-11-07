@@ -4,7 +4,9 @@
   <img src="./icon.png" alt="qmd2pdf extension icon" width="128">
 </p>
 
-A simple VS Code extension to go from `.qmd` to `.pdf` with live updates (like [Overleaf](https://www.overleaf.com/))
+<p align="center">
+A simple VS Code extension to go from <code>.qmd</code> to <code>.pdf</code> with live updates (like <a href="https://www.overleaf.com">Overleaf</a>)
+</p>
 
 ![](example.png)
 
