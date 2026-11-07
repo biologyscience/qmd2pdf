@@ -17,3 +17,15 @@
     .text-layer span, .text-layer br { position: absolute; color: transparent; white-space: pre; transform-origin: 0 0; user-select: text; }
     .text-layer > :not(.markedContent), .text-layer .markedContent span:not(.markedContent) { font-size: calc(var(--total-scale-factor) * var(--font-height)); transform: rotate(var(--rotate, 0deg)) scaleX(var(--scale-x, 1)); }
     .text-layer ::selection { background: rgb(0 100 255 / 30%); color: transparent; }
+    .render-overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px; background: rgb(0 0 0 / 55%); }
+    .render-overlay[hidden] { display: none; }
+    .render-dialog { display: flex; flex-direction: column; width: min(680px, 100%); max-height: min(560px, 80vh); padding: 18px; color: var(--vscode-foreground); background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); border-radius: 6px; box-shadow: 0 12px 40px rgb(0 0 0 / 45%); }
+    .render-heading { display: flex; align-items: center; gap: 10px; }
+    .render-heading h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 600; }
+    .render-close { min-width: 28px; padding: 0; font-size: 20px; line-height: 1; }
+    #render-message { margin: 12px 0; color: var(--vscode-descriptionForeground); }
+    #render-log { min-height: 120px; max-height: 390px; margin: 0; padding: 12px; overflow: auto; color: var(--vscode-terminal-foreground, var(--vscode-foreground)); background: var(--vscode-terminal-background, var(--vscode-sideBar-background)); border: 1px solid var(--vscode-panel-border); font-family: var(--vscode-editor-font-family, monospace); font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .render-spinner { width: 16px; height: 16px; border: 2px solid var(--vscode-descriptionForeground); border-top-color: var(--vscode-progressBar-background); border-radius: 50%; animation: render-spin .8s linear infinite; }
+    .render-spinner[hidden] { display: none; }
+    @keyframes render-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .render-spinner { animation-duration: 2s; } }

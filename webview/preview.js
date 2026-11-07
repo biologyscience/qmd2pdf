@@ -13,6 +13,12 @@
     const zoomSelect = document.getElementById("zoom-level");
     const zoomOutButton = document.getElementById("zoom-out");
     const zoomInButton = document.getElementById("zoom-in");
+    const renderOverlay = document.getElementById("render-overlay");
+    const renderTitle = document.getElementById("render-title");
+    const renderMessage = document.getElementById("render-message");
+    const renderLog = document.getElementById("render-log");
+    const renderSpinner = document.getElementById("render-spinner");
+    const renderCloseButton = document.getElementById("render-close");
     let documentVersion = 0;
     let renderVersion = 0;
     let hasPdf = false;
@@ -368,6 +374,9 @@
       status.textContent = "Choose where to save the PDF...";
       vscode.postMessage({ type: "savePdf" });
     });
+    renderCloseButton.addEventListener("click", () => {
+      renderOverlay.hidden = true;
+    });
     window.addEventListener("message", (event) => {
       const message = event.data;
       if (!message) return;
@@ -375,9 +384,37 @@
         showPdf(message.url);
       } else if (message.type === "renderStatus") {
         status.textContent = message.message;
+      } else if (message.type === "renderStarted") {
+        renderTitle.textContent = "Rendering PDF";
+        renderMessage.textContent = message.message || "Quarto is rendering the document...";
+        renderLog.textContent = "";
+        renderSpinner.hidden = false;
+        renderCloseButton.hidden = true;
+        renderOverlay.hidden = false;
+        renderOverlay.setAttribute("aria-busy", "true");
+      } else if (message.type === "renderLog") {
+        if (typeof message.text === "string") {
+          renderLog.textContent = (renderLog.textContent + message.text).slice(-20000);
+          renderLog.scrollTop = renderLog.scrollHeight;
+        }
+      } else if (message.type === "renderComplete") {
+        renderOverlay.hidden = true;
+        renderOverlay.setAttribute("aria-busy", "false");
       } else if (message.type === "renderError") {
         saveButton.disabled = !hasPdf;
         status.textContent = message.message;
+        renderTitle.textContent = "PDF render failed";
+        renderMessage.textContent = message.message || "Quarto could not render this document.";
+        if (typeof message.log === "string" && message.log) {
+          renderLog.textContent = message.log.slice(-20000);
+        } else if (!renderLog.textContent) {
+          renderLog.textContent = message.message || "No output was provided.";
+        }
+        renderLog.scrollTop = renderLog.scrollHeight;
+        renderSpinner.hidden = true;
+        renderCloseButton.hidden = false;
+        renderOverlay.hidden = false;
+        renderOverlay.setAttribute("aria-busy", "false");
       } else if (message.type === "savePdfResult") {
         saveButton.disabled = false;
         status.textContent = message.message;

@@ -196,6 +196,7 @@ function renderDocument(session: PreviewSession): Promise<void> {
 
   session.renderStatus = "Rendering PDF...";
   session.panel.webview.postMessage({ type: "renderStatus", message: session.renderStatus });
+  session.panel.webview.postMessage({ type: "renderStarted", message: session.renderStatus });
   return new Promise((resolve) => {
     const child = spawn("quarto", ["render", session.relativeFile], {
       cwd: session.workspaceDirectory,
@@ -205,8 +206,10 @@ function renderDocument(session: PreviewSession): Promise<void> {
     let output = "";
     let settled = false;
     const append = (chunk: Buffer | string) => {
-      output = (output + chunk.toString()).slice(-12000);
-      outputChannel.append(chunk.toString());
+      const text = chunk.toString();
+      output = (output + text).slice(-12000);
+      outputChannel.append(text);
+      session.panel.webview.postMessage({ type: "renderLog", text });
     };
 
     const finish = (error?: Error, code?: number | null) => {
@@ -230,6 +233,7 @@ function renderDocument(session: PreviewSession): Promise<void> {
         session.panel.webview.postMessage({
           type: "renderError",
           message: session.renderStatus,
+          log: output,
         });
         void vscode.window.showErrorMessage("qmd2pdf: PDF render failed. See the qmd2pdf output.");
         outputChannel.show(true);
@@ -246,6 +250,7 @@ function renderDocument(session: PreviewSession): Promise<void> {
         session.renderStatus = "PDF updated.";
         postRenderedPdf(session);
         session.panel.webview.postMessage({ type: "renderStatus", message: session.renderStatus });
+        session.panel.webview.postMessage({ type: "renderComplete" });
         resolve();
       }).catch((accessError: unknown) => {
         const message = accessError instanceof Error ? accessError.message : String(accessError);
@@ -253,6 +258,7 @@ function renderDocument(session: PreviewSession): Promise<void> {
         session.panel.webview.postMessage({
           type: "renderError",
           message: session.renderStatus,
+          log: output,
         });
         void vscode.window.showErrorMessage("qmd2pdf: render completed without producing the expected PDF.");
         resolve();

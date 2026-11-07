@@ -14,6 +14,8 @@ plus the mouse wheel to zoom; use Page Up/Down to move between pages. When a
 new render replaces the PDF, the preview keeps your current page and relative
 scroll position within that page, both horizontal and vertical scroll
 positions, and your zoom level.
+While Quarto renders, the preview shows a live log overlay. It closes when
+rendering succeeds and remains open with the error output if rendering fails.
 
 ## Requirements
 

@@ -26,6 +26,17 @@
     <span id="status" role="status" aria-live="polite">Waiting for the first render...</span>
   </header>
   <main id="pages" aria-label="PDF pages. Use Page Up and Page Down to navigate." tabindex="0"></main>
+  <section id="render-overlay" class="render-overlay" role="dialog" aria-modal="true" aria-labelledby="render-title" aria-describedby="render-message" hidden>
+    <div class="render-dialog">
+      <div class="render-heading">
+        <span id="render-spinner" class="render-spinner" aria-hidden="true"></span>
+        <h2 id="render-title">Rendering PDF</h2>
+        <button id="render-close" class="render-close" type="button" aria-label="Close render log" hidden>×</button>
+      </div>
+      <p id="render-message">Quarto is rendering the document...</p>
+      <pre id="render-log" aria-label="Quarto render output" aria-live="polite"></pre>
+    </div>
+  </section>
   <script type="module" nonce="{{nonce}}" src="{{scriptUri}}"></script>
 </body>
 </html>
