@@ -20,7 +20,7 @@
     .render-overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px; background: rgb(0 0 0 / 55%); }
     .render-overlay[hidden] { display: none; }
     .render-dialog { display: flex; flex-direction: column; width: min(680px, 100%); max-height: min(560px, 80vh); padding: 18px; color: var(--vscode-foreground); background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); border-radius: 6px; box-shadow: 0 12px 40px rgb(0 0 0 / 45%); }
-    .render-heading { display: flex; align-items: center; gap: 10px; }
+    .render-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 1em; }
     .render-heading h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 600; }
     .render-close { min-width: 28px; padding: 0; font-size: 20px; line-height: 1; }
     #render-message { margin: 12px 0; color: var(--vscode-descriptionForeground); }

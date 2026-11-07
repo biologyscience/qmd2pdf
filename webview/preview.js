@@ -15,7 +15,6 @@
     const zoomInButton = document.getElementById("zoom-in");
     const renderOverlay = document.getElementById("render-overlay");
     const renderTitle = document.getElementById("render-title");
-    const renderMessage = document.getElementById("render-message");
     const renderLog = document.getElementById("render-log");
     const renderSpinner = document.getElementById("render-spinner");
     const renderCloseButton = document.getElementById("render-close");
@@ -386,7 +385,6 @@
         status.textContent = message.message;
       } else if (message.type === "renderStarted") {
         renderTitle.textContent = "Rendering PDF";
-        renderMessage.textContent = message.message || "Quarto is rendering the document...";
         renderLog.textContent = "";
         renderSpinner.hidden = false;
         renderCloseButton.hidden = true;
@@ -404,7 +402,6 @@
         saveButton.disabled = !hasPdf;
         status.textContent = message.message;
         renderTitle.textContent = "PDF render failed";
-        renderMessage.textContent = message.message || "Quarto could not render this document.";
         if (typeof message.log === "string" && message.log) {
           renderLog.textContent = message.log.slice(-20000);
         } else if (!renderLog.textContent) {

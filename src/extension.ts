@@ -235,8 +235,7 @@ function renderDocument(session: PreviewSession): Promise<void> {
           message: session.renderStatus,
           log: output,
         });
-        void vscode.window.showErrorMessage("qmd2pdf: PDF render failed. See the qmd2pdf output.");
-        outputChannel.show(true);
+        void vscode.window.showErrorMessage("qmd2pdf: PDF render failed. See the render log in the preview.");
         resolve();
         return;
       }
