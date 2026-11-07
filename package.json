@@ -2,7 +2,7 @@
   "name": "qmd2pdf",
   "displayName": "qmd2pdf",
   "description": "Open Quarto QMD files with a live preview using their project configuration.",
-  "version": "1.0.2",
+  "version": "2.0.0",
   "publisher": "biologyscience",
   "license": "MIT",
   "icon": "icon.png",
@@ -75,7 +75,7 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && node scripts/copy-pdfjs.cjs",
     "watch": "tsc -watch -p ./",
     "package": "npm run compile && vsce package",
     "vscode:prepublish": "npm run compile"
@@ -85,5 +85,8 @@
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.6.0",
     "typescript": "^5.8.0"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^6.5.438"
   }
 }
