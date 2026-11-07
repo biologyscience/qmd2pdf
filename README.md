@@ -8,9 +8,11 @@ This VS Code extension renders the active `.qmd` file to PDF and displays it
 in a VS Code editor beside the document. Each saved QMD or changed project
 YAML/Lua configuration triggers a fresh `quarto render`; the preview updates
 when the new PDF is ready. The preview has page navigation, selectable PDF
-text, zoom controls, and lazy page rendering so it displays the first page
-without waiting for every page to be rasterized. Use the toolbar or Ctrl/Cmd
-plus the mouse wheel to zoom; use Page Up/Down to move between pages.
+text, and zoom controls. It renders all pages and starts the PDF.js worker
+while Quarto is rendering, reducing PDF viewer startup work. Use the toolbar or Ctrl/Cmd
+plus the mouse wheel to zoom; use Page Up/Down to move between pages. When a
+new render replaces the PDF, the preview keeps your current page and relative
+scroll position within that page.
 
 ## Requirements
 

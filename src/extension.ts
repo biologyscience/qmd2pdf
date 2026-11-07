@@ -380,10 +380,14 @@ function pdfPreviewHtml(
     let loadingTask;
     let zoomPercent = 100;
     let activePage = 1;
+    let pendingScrollAnchor;
     const pageViews = new Map();
     const renderTasks = new Map();
     const renderingPages = new Map();
     pdfjsLib.GlobalWorkerOptions.workerSrc = "${pdfWorkerUri}";
+    const pdfWorker = new pdfjsLib.PDFWorker({ name: "qmd2pdf" });
+    const pdfWorkerReady = pdfWorker.promise;
+    pdfWorkerReady.catch(() => {});
 
     function updatePageControls() {
       if (!pdfDocument) return;
@@ -402,9 +406,66 @@ function pdfPreviewHtml(
       zoomInButton.disabled = index < 0 || index >= zoomOptions.length - 1;
     }
 
+    function captureScrollAnchor() {
+      if (!pdfDocument) return undefined;
+      const containerRect = pages.getBoundingClientRect();
+      const viewportOffset = Math.min(24, pages.clientHeight / 4);
+      const anchorY = containerRect.top + viewportOffset;
+      let closestPage;
+      let closestDistance = Infinity;
+
+      for (const [pageNumber, view] of pageViews) {
+        const rect = view.element.getBoundingClientRect();
+        const distance = anchorY < rect.top
+          ? rect.top - anchorY
+          : anchorY > rect.bottom
+            ? anchorY - rect.bottom
+            : 0;
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestPage = { pageNumber, rect };
+        }
+        if (distance === 0) break;
+      }
+
+      if (!closestPage || closestPage.rect.height <= 0) return undefined;
+      return {
+        pageNumber: closestPage.pageNumber,
+        pageFraction: Math.max(0, Math.min(
+          1,
+          (anchorY - closestPage.rect.top) / closestPage.rect.height,
+        )),
+        viewportOffset,
+      };
+    }
+
+    function restoreScrollAnchor(pdf) {
+      if (!pendingScrollAnchor || pdf !== pdfDocument) return;
+      const anchor = pendingScrollAnchor;
+      pendingScrollAnchor = undefined;
+      const pageNumber = Math.min(anchor.pageNumber, pdf.numPages);
+      const view = pageViews.get(pageNumber);
+      if (!view) return;
+
+      const containerRect = pages.getBoundingClientRect();
+      const pageRect = view.element.getBoundingClientRect();
+      const pageTop = pages.scrollTop + pageRect.top - containerRect.top;
+      const targetScrollTop = pageTop + pageRect.height * anchor.pageFraction - anchor.viewportOffset;
+      const previousScrollBehavior = pages.style.scrollBehavior;
+      pages.style.scrollBehavior = "auto";
+      pages.scrollTop = Math.max(0, targetScrollTop);
+      window.requestAnimationFrame(() => {
+        pages.style.scrollBehavior = previousScrollBehavior;
+      });
+
+      activePage = pageNumber;
+      updatePageControls();
+    }
+
     function goToPage(pageNumber) {
       if (!pdfDocument) return;
       activePage = Math.max(1, Math.min(pdfDocument.numPages, Math.trunc(pageNumber) || 1));
+      createPageView(activePage, pdfDocument);
       pageViews.get(activePage)?.element.scrollIntoView({ block: "start" });
       updatePageControls();
       renderPage(activePage);
@@ -432,18 +493,7 @@ function pdfPreviewHtml(
         view.canvas.width = 0;
         view.canvas.height = 0;
       }
-      renderNearbyPages();
-    }
-
-    function renderNearbyPages() {
-      const bounds = pages.getBoundingClientRect();
-      const margin = Math.max(700, bounds.height);
-      for (const [pageNumber, view] of pageViews) {
-        const rect = view.element.getBoundingClientRect();
-        if (rect.bottom >= bounds.top - margin && rect.top <= bounds.bottom + margin) {
-          renderPage(pageNumber);
-        }
-      }
+      if (pdfDocument) void renderAllPages(pdfDocument);
     }
 
     async function renderPage(pageNumber) {
@@ -479,6 +529,9 @@ function pdfPreviewHtml(
         await renderTask.promise;
         if (doc === pdfDocument && version === renderVersion) {
           view.renderedZoom = zoomPercent;
+          if (pageNumber === 1) {
+            status.textContent = "PDF displayed";
+          }
           view.textLayer.style.setProperty("--total-scale-factor", String(scale * (96 / 72)));
           view.textLayerRenderer = new pdfjsLib.TextLayer({
             textContentSource: page.streamTextContent({ includeMarkedContent: true }),
@@ -508,19 +561,39 @@ function pdfPreviewHtml(
       }
     }
 
-    const pageObserver = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          const page = Number(entry.target.dataset.page);
-          renderPage(page);
-        }
+    function createPageView(pageNumber, pdf) {
+      if (pageViews.has(pageNumber) || pdf !== pdfDocument) return;
+      const element = document.createElement("section");
+      element.className = "page";
+      element.dataset.page = String(pageNumber);
+      element.setAttribute("aria-label", "Page " + pageNumber);
+      const canvas = document.createElement("canvas");
+      const textLayer = document.createElement("div");
+      textLayer.className = "text-layer";
+      element.append(canvas, textLayer);
+      pages.append(element);
+      pageViews.set(pageNumber, { element, canvas, textLayer, renderedZoom: 0 });
+    }
+
+    async function renderAllPages(pdf) {
+      if (pdf !== pdfDocument) return;
+      const currentVersion = renderVersion;
+      const pageNumbers = Array.from({ length: pdf.numPages }, (_, index) => index + 1);
+      await Promise.all(pageNumbers.map((pageNumber) => renderPage(pageNumber)));
+      if (pdf === pdfDocument && currentVersion === renderVersion) {
+        restoreScrollAnchor(pdf);
+        status.textContent = "PDF displayed (" + pdf.numPages + (pdf.numPages === 1 ? " page)." : " pages).");
       }
-    }, { root: pages, rootMargin: "900px 0px", threshold: [0, 0.25, 0.5, 0.75, 1] });
+    }
 
     async function showPdf(url) {
+      if (!pendingScrollAnchor) {
+        pendingScrollAnchor = captureScrollAnchor();
+      }
       const currentVersion = ++documentVersion;
       renderVersion++;
-      loadingTask?.destroy();
+      const previousLoadingTask = loadingTask;
+      loadingTask = undefined;
       for (const task of renderTasks.values()) task.cancel();
       renderTasks.clear();
       renderingPages.clear();
@@ -529,7 +602,6 @@ function pdfPreviewHtml(
       }
       pdfDocument = undefined;
       pageViews.clear();
-      pageObserver.disconnect();
       pages.replaceChildren();
       pageNumberInput.disabled = true;
       previousPageButton.disabled = true;
@@ -537,10 +609,15 @@ function pdfPreviewHtml(
       zoomSelect.disabled = true;
       zoomOutButton.disabled = true;
       zoomInButton.disabled = true;
-      status.textContent = "Loading rendered PDF...";
+      status.textContent = "Loading PDF...";
       try {
+        await previousLoadingTask?.destroy();
+        if (currentVersion !== documentVersion) return;
+        await pdfWorkerReady;
+        if (currentVersion !== documentVersion) return;
         loadingTask = pdfjsLib.getDocument({
           url,
+          worker: pdfWorker,
           cMapUrl: "${pdfAssetUri}cmaps/",
           cMapPacked: true,
           standardFontDataUrl: "${pdfAssetUri}standard_fonts/",
@@ -554,29 +631,19 @@ function pdfPreviewHtml(
         pdfDocument = pdf;
         hasPdf = true;
         activePage = 1;
-        const elements = [];
-        for (let page = 1; page <= pdf.numPages; page++) {
-          const element = document.createElement("section");
-          element.className = "page";
-          element.dataset.page = String(page);
-          element.setAttribute("aria-label", "Page " + page);
-          const canvas = document.createElement("canvas");
-          const textLayer = document.createElement("div");
-          textLayer.className = "text-layer";
-          element.append(canvas, textLayer);
-          elements.push(element);
-          pageViews.set(page, { element, canvas, textLayer, renderedZoom: 0 });
+        pages.replaceChildren();
+        pageViews.clear();
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+          createPageView(pageNumber, pdf);
         }
-        pages.replaceChildren(...elements);
-        for (const element of elements) pageObserver.observe(element);
         pageNumberInput.disabled = false;
         zoomSelect.disabled = false;
         zoomPercent = 100;
         updateZoomButtons();
         updatePageControls();
         saveButton.disabled = false;
-        status.textContent = "PDF ready";
-        renderPage(1);
+        status.textContent = "Rendering PDF pages...";
+        void renderAllPages(pdf);
       } catch (error) {
         if (currentVersion !== documentVersion) return;
         saveButton.disabled = !hasPdf;
@@ -606,7 +673,6 @@ function pdfPreviewHtml(
     }, { passive: false });
     pages.addEventListener("scroll", () => {
       window.requestAnimationFrame(() => {
-        renderNearbyPages();
         const bounds = pages.getBoundingClientRect();
         const center = bounds.top + bounds.height / 2;
         let nearestPage;
@@ -647,6 +713,10 @@ function pdfPreviewHtml(
         const options = [...zoomSelect.options].map((option) => Number(option.value));
         setZoom(options[Math.max(0, options.indexOf(zoomPercent) - 1)]);
       }
+    });
+    window.addEventListener("unload", () => {
+      void loadingTask?.destroy();
+      pdfWorker.destroy();
     });
 
     saveButton.addEventListener("click", () => {

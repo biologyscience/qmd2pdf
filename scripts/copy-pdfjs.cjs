@@ -6,8 +6,11 @@ const destinationRoot = path.join(__dirname, "..", "dist", "pdfjs");
 
 fs.mkdirSync(destinationRoot, { recursive: true });
 
-for (const file of ["pdf.mjs", "pdf.worker.mjs"]) {
-  fs.copyFileSync(path.join(sourceRoot, "build", file), path.join(destinationRoot, file));
+for (const [source, destination] of [
+  ["pdf.min.mjs", "pdf.mjs"],
+  ["pdf.worker.min.mjs", "pdf.worker.mjs"],
+]) {
+  fs.copyFileSync(path.join(sourceRoot, "build", source), path.join(destinationRoot, destination));
 }
 
 for (const directory of ["cmaps", "standard_fonts", "wasm"]) {
