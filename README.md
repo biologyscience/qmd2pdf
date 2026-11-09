@@ -32,6 +32,10 @@ rendering succeeds and remains open with the error output if rendering fails. --
 
 Download the latest `.vsix` file from the main branch and install it as an extension in VS Code
 
+## Example
+
+If you need an example `qmd` file to test this project's capabilities ➡️ [example.qmd](example.qmd)
+
 ## Use
 
 Open a `.qmd` file and select **qmd2pdf: Start Live Preview** from the
