@@ -121,10 +121,8 @@
     }
 
     function setZoom(value) {
-      const options = [...zoomSelect.options].map((option) => Number(option.value));
-      const nextZoom = Math.max(options[0], Math.min(options[options.length - 1], value));
-      if (nextZoom === zoomPercent) return;
-      zoomPercent = nextZoom;
+      if (value === zoomPercent) return;
+      zoomPercent = value;
       refreshVisiblePages();
       updateZoomButtons();
     }
@@ -315,9 +313,15 @@
     pages.addEventListener("wheel", (event) => {
       if (event.ctrlKey || event.metaKey) {
         event.preventDefault();
-        const options = [...zoomSelect.options].map((option) => Number(option.value));
-        const index = options.indexOf(zoomPercent);
-        setZoom(options[Math.max(0, Math.min(options.length - 1, index + (event.deltaY < 0 ? 1 : -1)))]);
+        // Calculate new zoom percentage based on scroll delta.
+        // Using a step of 5% per scroll tick.
+        const step = event.deltaY < 0 ? 5 : -5;
+        let newZoom = zoomPercent + step;
+
+        // Clamp the zoom percentage between 50% and 300%
+        newZoom = Math.max(50, Math.min(300, newZoom));
+
+        setZoom(newZoom);
       }
     }, { passive: false });
     pages.addEventListener("scroll", () => {

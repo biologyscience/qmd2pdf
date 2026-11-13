@@ -2,7 +2,7 @@
   "name": "qmd2pdf",
   "displayName": "qmd2pdf",
   "description": "Open Quarto QMD files with a live PDF preview.",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "publisher": "biologyscience",
   "license": "MIT",
   "icon": "icon.png",
